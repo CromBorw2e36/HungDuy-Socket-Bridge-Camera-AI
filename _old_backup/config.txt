@@ -1,0 +1,15 @@
+# Configuration file for Face Recognition Server
+# Path to the main application file
+APP_PATH=k:\Project\HungDuyCoLTD\BridgeWebCamera\main_api_cam.py
+
+# Python executable path (optional - will use system python if not specified)
+PYTHON_PATH=python
+
+# Working directory
+WORK_DIR=k:\Project\HungDuyCoLTD\BridgeWebCamera
+
+# Log file path
+LOG_FILE=k:\Project\HungDuyCoLTD\BridgeWebCamera\app.log
+
+# Process name for identification
+PROCESS_NAME=face_recognition_server

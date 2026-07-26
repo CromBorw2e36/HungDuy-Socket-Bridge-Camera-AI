@@ -1,0 +1,22 @@
+# Build context chỉ cần requirements.txt + deploy/vendor/ (code bind-mount lúc chạy)
+id_rsa
+id_rsa.*
+id_ed25519*
+*.pem
+venv/
+cmd1/
+Web/
+testcamera/
+__pycache__/
+*.pyc
+*.log
+*.jpg
+query
+test_client.py
+socket_server.py
+config.txt
+config_windows.txt
+README*.md
+.gitignore
+deploy/windows/
+employees_data/

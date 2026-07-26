@@ -1,0 +1,18 @@
+# Secrets — KHÔNG BAO GIỜ commit/đóng gói private key
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.pem
+*.ppk
+
+# Môi trường / build
+venv/
+__pycache__/
+*.pyc
+
+# File tạm / debug / log
+*.log
+imgs/
+1.jpg
+query

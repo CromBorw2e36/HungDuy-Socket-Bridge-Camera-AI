@@ -1,0 +1,28 @@
+# /etc/systemd/system/bridgecam.service
+# sudo systemctl daemon-reload && sudo systemctl enable --now bridgecam
+[Unit]
+Description=BridgeWebCamera face recognition server (Docker)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+# Đổi BWC_CAMERA sang đường dẫn ổn định: ls /dev/v4l/by-id/ -> ...-video-index0
+Environment=BWC_CAMERA=/dev/video0
+Restart=always
+RestartSec=10
+TimeoutStartSec=300
+# Chờ NPU + camera xuất hiện (USB enumerate lúc boot có thể chậm hơn dockerd)
+ExecStartPre=/bin/sh -c 'until [ -e /dev/hailo0 ] && [ -e ${BWC_CAMERA} ]; do sleep 2; done'
+ExecStartPre=-/usr/bin/docker rm -f bridgecam
+ExecStart=/usr/bin/docker run --name bridgecam --network host \
+  --device /dev/hailo0 \
+  --device ${BWC_CAMERA}:/dev/video0 \
+  -v /opt/bridgecam/app:/app \
+  -v /opt/bridgecam/employees_data:/app/employees_data \
+  --log-opt max-size=10m --log-opt max-file=3 \
+  bridgecam:4.21.0
+ExecStop=/usr/bin/docker stop bridgecam
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .video-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #videoFrame {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+        .recognition-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .recognition-info h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .info-value {
+            color: #6c757d;
+        }
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .logs {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Face Recognition Client</h1>
+        
+        <div id="status" class="status disconnected">
+            Disconnected
+        </div>
+        
+        <div class="controls">
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+            <input type="text" id="serverHost" placeholder="Server Host" value="localhost">
+            <input type="number" id="serverPort" placeholder="Port" value="8765">
+        </div>
+        
+        <div class="video-container">
+            <img id="videoFrame" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" alt="Video Feed">
+        </div>
+        
+        <div class="recognition-info">
+            <h3>Recognition Information</h3>
+            <div class="info-row">
+                <span class="info-label">UUID:</span>
+                <span class="info-value" id="uuid">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Name:</span>
+                <span class="info-value" id="name">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Confidence:</span>
+                <span class="info-value" id="confidence">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Last Update:</span>
+                <span class="info-value" id="timestamp">-</span>
+            </div>
+        </div>
+        
+        <h3>Connection Logs</h3>
+        <div id="logs" class="logs"></div>
+    </div>
+    
+    <script>
+        let socket = null;
+        let isConnected = false;
+        
+        function log(message) {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        function updateStatus(connected) {
+            const status = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            
+            if (connected) {
+                status.textContent = 'Connected';
+                status.className = 'status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                status.textContent = 'Disconnected';
+                status.className = 'status disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+            isConnected = connected;
+        }
+        
+        function connect() {
+            const host = document.getElementById('serverHost').value || 'localhost';
+            const port = document.getElementById('serverPort').value || '8080';
+            
+            try {
+                socket = new WebSocket(`ws://${host}:${port}`);
+                
+                socket.onopen = function(event) {
+                    log('Connected to server');
+                    updateStatus(true);
+                };
+                
+                socket.onmessage = function(event) {
+                    try {
+                        // Handle simple string format: UUID:xxx|NAME:xxx|CONFIDENCE:xxx|IMAGE:xxx
+                        const data = event.data;
+                        if (data.includes('UUID:')) {
+                            const parts = data.split('|');
+                            let uuid = '', name = '', confidence = '', imageData = '';
+                            
+                            parts.forEach(part => {
+                                if (part.startsWith('UUID:')) {
+                                    uuid = part.substring(5);
+                                } else if (part.startsWith('NAME:')) {
+                                    name = part.substring(5);
+                                } else if (part.startsWith('CONFIDENCE:')) {
+                                    confidence = part.substring(11);
+                                } else if (part.startsWith('IMAGE:')) {
+                                    imageData = part.substring(6);
+                                }
+                            });
+                            
+                            // Update UI
+                            document.getElementById('uuid').textContent = uuid || '-';
+                            document.getElementById('name').textContent = name || '-';
+                            document.getElementById('confidence').textContent = confidence || '-';
+                            document.getElementById('timestamp').textContent = new Date().toLocaleTimeString();
+                            
+                            // Update image if available
+                            if (imageData && imageData.length > 0) {
+                                document.getElementById('videoFrame').src = `data:image/jpeg;base64,${imageData}`;
+                            }
+                            
+                            if (uuid && name) {
+                                log(`Recognition: ${name} (${uuid}) - ${confidence}`);
+                            }
+                        } else {
+                            // Try JSON format
+                            const message = JSON.parse(data);
+                            if (message.type === 'frame') {
+                                // Update image
+                                document.getElementById('videoFrame').src = `data:image/jpeg;base64,${message.image}`;
+                                
+                                // Update recognition info
+                                const recognition = message.recognition;
+                                document.getElementById('uuid').textContent = recognition.uuid || '-';
+                                document.getElementById('name').textContent = recognition.name || '-';
+                                document.getElementById('confidence').textContent = recognition.confidence ? recognition.confidence.toFixed(3) : '-';
+                                document.getElementById('timestamp').textContent = new Date(message.timestamp * 1000).toLocaleTimeString();
+                                
+                                if (recognition.uuid && recognition.name) {
+                                    log(`Recognition: ${recognition.name} (${recognition.uuid}) - ${recognition.confidence.toFixed(3)}`);
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        log(`Error parsing message: ${error}`);
+                    }
+                };
+                
+                socket.onclose = function(event) {
+                    log('Disconnected from server');
+                    updateStatus(false);
+                };
+                
+                socket.onerror = function(error) {
+                    log(`Connection error: ${error}`);
+                    updateStatus(false);
+                };
+                
+            } catch (error) {
+                log(`Failed to connect: ${error}`);
+                updateStatus(false);
+            }
+        }
+        
+        function disconnect() {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+            updateStatus(false);
+        }
+        
+        // Auto-connect on page load
+        window.onload = function() {
+            log('Page loaded. Click Connect to start receiving data.');
+        };
+    </script>
+</body>
+</html>

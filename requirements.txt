@@ -1,0 +1,9 @@
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+pandas==2.2.3
+faiss-cpu==1.8.0
+packaging==24.1
+websockets==13.1
+loguru==0.7.3
+pillow==11.3.0
+requests==2.32.5

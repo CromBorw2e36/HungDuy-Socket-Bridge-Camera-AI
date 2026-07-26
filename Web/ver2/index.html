@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <title>Title</title>
+        <!-- Required meta tags -->
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, shrink-to-fit=no"
+        />
+
+        <!-- Bootstrap CSS v5.2.1 -->
+        <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+            integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+            crossorigin="anonymous"
+        />
+        <!-- Font Awesome -->
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+            integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+            crossorigin="anonymous"
+        />
+    </head>
+
+    <body>
+        <header>
+            <!-- place navbar here -->
+        </header>
+        <main>
+            <div class="container mt-4">
+                <div class="row">
+                    <div class="col-12">
+                        <h1 class="text-center mb-4">Face Recognition System</h1>
+                        
+                        <!-- Connection Status -->
+                        <div class="alert alert-info text-center" id="connectionStatus">
+                            <span id="statusText">Connecting...</span>
+                            <span id="statusIndicator" class="badge bg-warning ms-2">●</span>
+                        </div>
+                        
+                        <!-- Video Stream -->
+                        <div class="text-center mb-4">
+                            <img id="videoStream" 
+                                 src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='480' viewBox='0 0 640 480'%3E%3Crect width='640' height='480' fill='%23f0f0f0'/%3E%3Ctext x='320' y='240' text-anchor='middle' dy='.3em' fill='%23999' font-size='24'%3EConnecting...%3C/text%3E%3C/svg%3E" 
+                                 alt="Live Video Stream" 
+                                 class="img-fluid border rounded shadow"
+                                 style="max-width: 640px; max-height: 480px;">
+                        </div>
+                        
+                        <!-- Control Buttons -->
+                        <div class="text-center mb-4">
+                            <button id="btnSave" class="btn btn-primary btn-lg me-3">
+                                <i class="fas fa-save"></i> Save Detection Log
+                            </button>
+                            <button id="btnReconnect" class="btn btn-secondary btn-lg me-3">
+                                <i class="fas fa-sync"></i> Reconnect
+                            </button>
+                            <button id="btnDebug" class="btn btn-info btn-lg">
+                                <i class="fas fa-bug"></i> Debug Info
+                            </button>
+                        </div>
+                        
+                        <!-- Current Detection Info -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Current Detection Information</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>Name:</strong> <span id="currentName">No detection</span></p>
+                                        <p><strong>UUID:</strong> <span id="currentUuid">-</span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p><strong>Confidence:</strong> <span id="currentConfidence">-</span></p>
+                                        <p><strong>Last Update:</strong> <span id="lastUpdate">-</span></p>
+                                    </div>
+                                </div>
+                                <!-- Cropped Face Display -->
+                                <div class="row mt-3" id="croppedFaceContainer" style="display: none;">
+                                    <div class="col-12">
+                                        <hr>
+                                        <h6><i class="fas fa-user-circle"></i> Detected Face</h6>
+                                        <div class="text-center">
+                                            <img id="croppedFace" class="img-thumbnail" style="max-width: 150px; max-height: 150px;" alt="Detected face">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <footer>
+            <!-- place footer here -->
+        </footer>
+        <!-- Bootstrap JavaScript Libraries -->
+        <script
+            src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
+            integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r"
+            crossorigin="anonymous"
+        ></script>
+
+        <script
+            src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js"
+            integrity="sha384-BBtl+eGJRgqQAUMxJ7pMwbEyER4l1g+O15P+16Ep7Q9Q+zqX6gSbd85u4mG4QzX+"
+            crossorigin="anonymous"
+        ></script>
+        <script>
+            class FaceRecognitionService {
+                constructor() {
+                    this.socket = null;
+                    this.isConnected = false;
+                    this.messageCount = 0;
+                    this.lastMessageTime = null;
+                    this.validDetectionCount = 0;
+                    this.currentDetection = {
+                        uuid: '',
+                        name: '',
+                        confidence: 0,
+                        image: '',
+                        timestamp: null
+                    };
+                    
+                    this.config = {
+                        host: 'localhost',
+                        port: 8765,
+                        protocol: 'ws'
+                    };
+                }
+                
+                // Connect to WebSocket server
+                async connect() {
+                    return new Promise((resolve, reject) => {
+                        try {
+                            const url = `${this.config.protocol}://${this.config.host}:${this.config.port}`;
+                            console.log(`Connecting to: ${url}`);
+                            
+                            this.socket = new WebSocket(url);
+                            
+                            this.socket.onopen = () => {
+                                this.isConnected = true;
+                                console.log('WebSocket connected successfully');
+                                this.updateConnectionStatus();
+                                resolve(true);
+                            };
+                            
+                            this.socket.onmessage = (event) => {
+                                this.handleMessage(event.data);
+                            };
+                            
+                            this.socket.onclose = (event) => {
+                                this.isConnected = false;
+                                console.log('WebSocket connection closed:', event.code, event.reason);
+                                this.updateConnectionStatus();
+                            };
+                            
+                            this.socket.onerror = (error) => {
+                                console.error('WebSocket error:', error);
+                                reject(error);
+                            };
+                            
+                        } catch (error) {
+                            console.error('Failed to create WebSocket:', error);
+                            reject(error);
+                        }
+                    });
+                }
+                
+                // Handle incoming WebSocket messages
+                handleMessage(data) {
+                    this.messageCount++;
+                    this.lastMessageTime = new Date();
+                    
+                    try {
+                        const message = JSON.parse(data);
+                        
+                        if (message.type === 'frame') {
+                            // Count valid detections
+                            if (message.recognition && message.recognition.uuid && message.recognition.name) {
+                                this.validDetectionCount++;
+                            }
+                            
+                            // Log all received recognition data for debugging
+                            console.log(`📦 Message #${this.messageCount} - Frame with recognition:`, {
+                                hasRecognition: !!(message.recognition && message.recognition.uuid),
+                                recognition: message.recognition,
+                                timestamp: new Date(message.timestamp * 1000).toLocaleTimeString(),
+                                validDetections: this.validDetectionCount
+                            });
+                            this.processFrame(message);
+                        } else {
+                            console.log('Received unknown message type:', message.type);
+                        }
+                        
+                    } catch (error) {
+                        // Handle simple string format: UUID:xxx|NAME:xxx|CONFIDENCE:xxx|IMAGE:xxx
+                        if (data.includes('UUID:')) {
+                            console.log('Processing simple format message');
+                            this.processSimpleFormat(data);
+                        } else {
+                            console.error('Error parsing message:', error, 'Data:', data.substring(0, 100) + '...');
+                        }
+                    }
+                }
+                
+                // Process frame message (JSON format)
+                processFrame(message) {
+                    const { image, face, recognition, timestamp } = message;
+                    
+                    // Always update video stream if image is present
+                    if (image) {
+                        const imageUrl = `data:image/jpeg;base64,${image}`;
+                        document.getElementById('videoStream').src = imageUrl;
+                    }
+                    
+                    // Check if recognition data is valid
+                    const hasValidRecognition = recognition && 
+                                              recognition.uuid && 
+                                              recognition.uuid.trim() !== '' && 
+                                              recognition.name && 
+                                              recognition.name.trim() !== '';
+                    
+                    if (hasValidRecognition) {
+                        this.currentDetection = {
+                            uuid: recognition.uuid,
+                            name: recognition.name,
+                            confidence: recognition.confidence || 0,
+                            image: image,
+                            face: face || '',
+                            timestamp: timestamp * 1000 // Convert to milliseconds
+                        };
+                        
+                        this.updateDetectionUI();
+                        
+                        console.log('✅ Valid face detected:', {
+                            name: recognition.name,
+                            uuid: recognition.uuid,
+                            confidence: (recognition.confidence * 100).toFixed(2) + '%',
+                            hasFace: !!face,
+                            timestamp: new Date(timestamp * 1000).toLocaleTimeString()
+                        });
+                    } else {
+                        // Only clear detection if we explicitly have empty recognition data
+                        if (recognition) {
+                            this.currentDetection = {
+                                uuid: '',
+                                name: '',
+                                confidence: 0,
+                                image: image || '',
+                                face: '',
+                                timestamp: timestamp * 1000
+                            };
+                            
+                            this.updateDetectionUI();
+                            
+                            console.log('❌ No face recognition (empty data):', {
+                                recognition: recognition,
+                                timestamp: new Date(timestamp * 1000).toLocaleTimeString()
+                            });
+                        }
+                        // If no recognition object at all, just update the image without changing detection data
+                    }
+                }
+                
+                // Process simple string format
+                processSimpleFormat(data) {
+                    const parts = data.split('|');
+                    let uuid = '', name = '', confidence = '', imageData = '', faceData = '';
+                    
+                    parts.forEach(part => {
+                        if (part.startsWith('UUID:')) {
+                            uuid = part.substring(5);
+                        } else if (part.startsWith('NAME:')) {
+                            name = part.substring(5);
+                        } else if (part.startsWith('CONFIDENCE:')) {
+                            confidence = part.substring(11);
+                        } else if (part.startsWith('IMAGE:')) {
+                            imageData = part.substring(6);
+                        } else if (part.startsWith('FACE:')) {
+                            faceData = part.substring(5);
+                        }
+                    });
+                    
+                    // Update video stream
+                    if (imageData) {
+                        const imageUrl = `data:image/jpeg;base64,${imageData}`;
+                        document.getElementById('videoStream').src = imageUrl;
+                    }
+                    
+                    // Update current detection
+                    if (uuid && name) {
+                        this.currentDetection = {
+                            uuid: uuid,
+                            name: name,
+                            confidence: parseFloat(confidence),
+                            image: imageData,
+                            face: faceData,
+                            timestamp: Date.now()
+                        };
+                        
+                        this.updateDetectionUI();
+                        
+                        console.log('Face detected:', {
+                            name: name,
+                            uuid: uuid,
+                            confidence: confidence,
+                            hasFace: !!faceData
+                        });
+                    } else {
+                        // Clear detection if no face found
+                        this.currentDetection = {
+                            uuid: '',
+                            name: '',
+                            confidence: 0,
+                            image: imageData || '',
+                            face: '',
+                            timestamp: Date.now()
+                        };
+                        
+                        this.updateDetectionUI();
+                    }
+                }
+                
+                // Get current detection info
+                getCurrentDetection() {
+                    return { ...this.currentDetection };
+                }
+                
+                // Disconnect from server
+                disconnect() {
+                    if (this.socket) {
+                        this.socket.close(1000, 'User disconnected');
+                        this.socket = null;
+                    }
+                    this.isConnected = false;
+                }
+                
+                // Get connection status
+                getConnectionStatus() {
+                    return this.isConnected;
+                }
+                
+                // Update UI with current detection
+                updateDetectionUI() {
+                    const nameEl = document.getElementById('currentName');
+                    const uuidEl = document.getElementById('currentUuid');
+                    const confidenceEl = document.getElementById('currentConfidence');
+                    const updateTimeEl = document.getElementById('lastUpdate');
+                    const croppedFaceEl = document.getElementById('croppedFace');
+                    const croppedFaceContainer = document.getElementById('croppedFaceContainer');
+                    
+                    if (this.currentDetection.uuid && this.currentDetection.name) {
+                        nameEl.textContent = this.currentDetection.name;
+                        uuidEl.textContent = this.currentDetection.uuid;
+                        confidenceEl.textContent = (this.currentDetection.confidence * 100).toFixed(2) + '%';
+                        updateTimeEl.textContent = new Date(this.currentDetection.timestamp).toLocaleTimeString();
+                        
+                        // Show cropped face if available
+                        if (this.currentDetection.face && this.currentDetection.face.trim() !== '') {
+                            croppedFaceEl.src = `data:image/jpeg;base64,${this.currentDetection.face}`;
+                            croppedFaceContainer.style.display = 'block';
+                        } else {
+                            croppedFaceContainer.style.display = 'none';
+                        }
+                    } else {
+                        nameEl.textContent = 'No detection';
+                        uuidEl.textContent = '-';
+                        confidenceEl.textContent = '-';
+                        updateTimeEl.textContent = this.currentDetection.timestamp ? 
+                            new Date(this.currentDetection.timestamp).toLocaleTimeString() : '-';
+                        croppedFaceContainer.style.display = 'none';
+                    }
+                }
+                
+                // Update connection status UI
+                updateConnectionStatus() {
+                    const statusEl = document.getElementById('connectionStatus');
+                    const statusTextEl = document.getElementById('statusText');
+                    const statusIndicatorEl = document.getElementById('statusIndicator');
+                    
+                    if (this.isConnected) {
+                        statusEl.className = 'alert alert-success text-center';
+                        statusTextEl.textContent = 'Connected to Face Recognition Server';
+                        statusIndicatorEl.className = 'badge bg-success ms-2';
+                        statusIndicatorEl.textContent = '●';
+                    } else {
+                        statusEl.className = 'alert alert-danger text-center';
+                        statusTextEl.textContent = 'Disconnected from Face Recognition Server';
+                        statusIndicatorEl.className = 'badge bg-danger ms-2';
+                        statusIndicatorEl.textContent = '●';
+                    }
+                }
+                
+                // Debug info method
+                getDebugInfo() {
+                    return {
+                        connectionStatus: this.isConnected,
+                        socketState: this.socket ? this.socket.readyState : 'null',
+                        currentDetection: this.currentDetection,
+                        serverConfig: this.config,
+                        lastMessageTime: this.lastMessageTime || 'Never',
+                        messageCount: this.messageCount || 0
+                    };
+                }
+            }
+            
+            // Initialize service
+            const faceService = new FaceRecognitionService();
+            
+            // Auto-connect when page loads
+            window.addEventListener('load', async () => {
+                // Initialize UI
+                faceService.updateConnectionStatus();
+                
+                try {
+                    await faceService.connect();
+                    console.log('Face recognition service connected successfully');
+                } catch (error) {
+                    console.error('Failed to connect to face recognition service:', error);
+                }
+            });
+            
+            // Reconnect button event listener
+            document.getElementById('btnReconnect').addEventListener('click', async () => {
+                console.log('Attempting to reconnect...');
+                
+                // Update status to connecting
+                const statusEl = document.getElementById('connectionStatus');
+                const statusTextEl = document.getElementById('statusText');
+                const statusIndicatorEl = document.getElementById('statusIndicator');
+                
+                statusEl.className = 'alert alert-warning text-center';
+                statusTextEl.textContent = 'Reconnecting...';
+                statusIndicatorEl.className = 'badge bg-warning ms-2';
+                
+                try {
+                    // Disconnect first if connected
+                    faceService.disconnect();
+                    
+                    // Wait a moment then reconnect
+                    setTimeout(async () => {
+                        try {
+                            await faceService.connect();
+                            console.log('Reconnected successfully');
+                        } catch (error) {
+                            console.error('Reconnection failed:', error);
+                            faceService.updateConnectionStatus();
+                        }
+                    }, 1000);
+                } catch (error) {
+                    console.error('Reconnection error:', error);
+                    faceService.updateConnectionStatus();
+                }
+            });
+            
+            // Debug button event listener
+            document.getElementById('btnDebug').addEventListener('click', () => {
+                const debugInfo = faceService.getDebugInfo();
+                
+                console.log('=== DEBUG INFO ===');
+                console.log('Connection Status:', debugInfo.connectionStatus);
+                console.log('Socket State:', debugInfo.socketState);
+                console.log('Message Count:', faceService.messageCount);
+                console.log('Valid Detection Count:', faceService.validDetectionCount);
+                console.log('Last Message Time:', debugInfo.lastMessageTime);
+                console.log('Current Detection:', debugInfo.currentDetection);
+                console.log('Server Config:', debugInfo.serverConfig);
+                console.log('==================');
+                
+                // Show in alert as well
+                const alertMessage = `Debug Information:
+                                        Connection: ${debugInfo.connectionStatus ? 'Connected' : 'Disconnected'}
+                                        Socket State: ${debugInfo.socketState}
+                                        Total Messages: ${faceService.messageCount}
+                                        Valid Detections: ${faceService.validDetectionCount}
+                                        Last Message: ${debugInfo.lastMessageTime}
+                                        Current Detection: ${debugInfo.currentDetection.name || 'None'}`;
+                alert(alertMessage);
+            });
+            
+            // Save button event listener
+            var btnSave = document.getElementById("btnSave");
+            btnSave.addEventListener("click", function () {
+                /// Log uuid, name, confidence, image (in tag image) 
+                const detection = faceService.getCurrentDetection();
+                const videoStream = document.getElementById('videoStream');
+                
+                // Create log entry
+                const logEntry = {
+                    uuid: detection.uuid,
+                    name: detection.name,
+                    confidence: detection.confidence,
+                    image: detection.image,
+                    imageUrl: videoStream.src,
+                    timestamp: detection.timestamp || Date.now(),
+                    date: new Date(detection.timestamp || Date.now()).toLocaleString(),
+                    connectionStatus: faceService.getConnectionStatus()
+                };
+                
+                // Print log to console
+                console.log('=== FACE DETECTION LOG ===');
+                console.log('UUID:', logEntry.uuid || 'No detection');
+                console.log('Name:', logEntry.name || 'No detection');
+                console.log('Confidence:', logEntry.confidence ? (logEntry.confidence * 100).toFixed(2) + '%' : 'No detection');
+                console.log('Timestamp:', logEntry.date);
+                console.log('Connection Status:', logEntry.connectionStatus ? 'Connected' : 'Disconnected');
+                console.log('Image URL:', logEntry.imageUrl || 'No image');
+                console.log('Image Data Length:', logEntry.image ? logEntry.image.length : 0);
+                console.log('========================');
+                
+                // Also display in alert for user feedback
+                let message = '';
+                if (logEntry.uuid && logEntry.name) {
+                    message = `Face Detection Log:
+                                Name: ${logEntry.name}
+                                UUID: ${logEntry.uuid}
+                                Confidence: ${(logEntry.confidence * 100).toFixed(2)}%
+                                Time: ${logEntry.date}
+                                Status: Connected`;
+                } else {
+                    message = `No Face Detected
+                                Current Image: ${logEntry.imageUrl ? 'Available' : 'No image'}
+                                Time: ${logEntry.date}
+                                Status: ${logEntry.connectionStatus ? 'Connected' : 'Disconnected'}`;
+                }
+                
+                alert(message);
+                
+                // Return log entry for potential further processing
+                return logEntry;
+            });
+            
+            // Make service globally available for debugging
+            window.faceService = faceService;
+        </script>
+    </body>
+</html>

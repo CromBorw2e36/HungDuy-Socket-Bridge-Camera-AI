@@ -1,0 +1,32 @@
+[Unit]
+Description=Face Recognition Server
+Documentation=Face Recognition Server for Bridge Web Camera
+After=network.target
+Wants=network.target
+
+[Service]
+Type=forking
+User=root
+Group=root
+WorkingDirectory=/k/Project/HungDuyCoLTD/BridgeWebCamera
+ExecStart=/k/Project/HungDuyCoLTD/BridgeWebCamera/cmd/face_recognition_server.sh start
+ExecStop=/k/Project/HungDuyCoLTD/BridgeWebCamera/cmd/face_recognition_server.sh stop
+ExecReload=/k/Project/HungDuyCoLTD/BridgeWebCamera/cmd/face_recognition_server.sh restart
+PIDFile=/k/Project/HungDuyCoLTD/BridgeWebCamera/face_recognition_server.pid
+Restart=always
+RestartSec=10
+StandardOutput=append:/k/Project/HungDuyCoLTD/BridgeWebCamera/service.log
+StandardError=append:/k/Project/HungDuyCoLTD/BridgeWebCamera/service.log
+
+# Environment variables
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PYTHONPATH=/k/Project/HungDuyCoLTD/BridgeWebCamera
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/k/Project/HungDuyCoLTD/BridgeWebCamera
+
+[Install]
+WantedBy=multi-user.target
