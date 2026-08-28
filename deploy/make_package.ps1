@@ -7,10 +7,25 @@ $zip   = Join-Path (Split-Path $root -Parent) "BridgeWebCamera-setup.zip"
 Remove-Item -Recurse -Force (Split-Path $stage -Parent) -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $stage | Out-Null
 
+# Wheel pyhailort Windows nam trong bo cai .msi, khong co tren PyPI -> nap vao vendor
+# ngay tu may DEV (may nay thuong da cai HailoRT). Khong co thi may kiosk phai tu tim.
+$hailoVersion = '4.21.0'
+$winWhl = Join-Path $root ("deploy\vendor\hailort-{0}-cp310-cp310-win_amd64.whl" -f $hailoVersion)
+if (-not (Test-Path $winWhl)) {
+    $fetch = Join-Path $root 'deploy\windows\fetch_hailo_wheel.ps1'
+    if (Test-Path $fetch) { & $fetch -Version $hailoVersion }
+}
+foreach ($v in @(("hailort-{0}-cp310-cp310-win_amd64.whl" -f $hailoVersion),
+                 ("hailort-{0}-cp310-cp310-linux_x86_64.whl" -f $hailoVersion))) {
+    if (-not (Test-Path (Join-Path $root ('deploy\vendor\' + $v)))) {
+        Write-Warning ("Goi se THIEU wheel: deploy\vendor\" + $v)
+    }
+}
+
 # Chi dong goi nhung gi may kiosk can (khong log, __pycache__, cmd1 cu, venv, id_rsa...)
 $include = @(
     "main_api_cam.py", "Utils.py", "hailo_inference.py", "websocket_server.py",
-    "requirements.txt", "README_TRIENKHAI.md", ".dockerignore",
+    "requirements.txt", "README_TRIEN_KHAI.md", ".dockerignore",
     "scrfd_2.5g.hef", "arcface_r50.hef",
     "deploy", "Web"
 )

@@ -23,8 +23,9 @@ BridgeWebCamera/           ← copy nguyên thư mục này (USB/mạng nội b�
 ├── deploy/vendor/         ← nạp 1 lần trên máy có mạng + tài khoản Developer Zone:
 │   ├── hailort_4.21.0_windows_installer.msi          (Windows driver+runtime)
 │   ├── hailort-4.21.0-cp310-cp310-win_amd64.whl      (Windows pyhailort — KHÔNG có link tải riêng:
-│   │                                                  nằm trong bộ cài .msi; cài .msi xong lấy từ
-│   │                                                  C:\Program Files\HailoRT\ → dir /s /b *.whl)
+│   │                                                  nằm trong bộ cài .msi. KHÔNG phải làm tay nữa:
+│   │                                                  deploy\windows\fetch_hailo_wheel.ps1 tự tìm+copy
+│   │                                                  vào vendor, và install.bat gọi nó khi thiếu)
 │   ├── hailort_4.21.0_amd64.deb                      (Linux runtime, cho build image)
 │   ├── hailort-4.21.0-cp310-cp310-linux_x86_64.whl   (Linux pyhailort, cho build image)
 │   └── pip/               ← py -3.10 -m pip download -r requirements.txt -d deploy/vendor/pip
@@ -39,10 +40,37 @@ BridgeWebCamera/           ← copy nguyên thư mục này (USB/mạng nội b�
 
 | OS | Cài | Việc tay còn lại |
 |---|---|---|
-| Windows | Chạy **`deploy\windows\install.bat`** (Admin) | Cài Python 3.10 trước; click `.msi`; bật auto-logon (netplwiz) |
+| Windows | Chạy **`deploy\windows\install.bat`** (Admin) | Bật quyền camera cho desktop app; bật auto-logon (netplwiz) |
 | Ubuntu | **`sudo bash deploy/linux/install.sh`** (chạy lại 1 lần sau reboot nếu script yêu cầu đổi kernel) | Cắm Hailo + camera |
 
-`install.bat` tự làm: venv + pip (offline nếu có vendor/pip) + firewall 8765 + tắt PCIe power + đăng ký task logon. `install.sh` tự làm: kernel-gate → driver+firmware+udev+docker → copy code vào /opt/bridgecam → `docker load` image → cài + bật service.
+`install.bat` tự làm: **cài Python 3.10** (nếu thiếu) → venv + pip (offline nếu có vendor/pip) → **wheel pyhailort** (vendor → quét máy → chạy `.msi`) → firewall 8765 → tắt PCIe power → đăng ký task logon. `install.sh` tự làm: kernel-gate → driver+firmware+udev+docker → copy code vào /opt/bridgecam → `docker load` image → cài + bật service.
+
+### Wheel pyhailort Windows — tự nạp vào vendor
+
+`deploy\windows\fetch_hailo_wheel.ps1` chạy theo 4 bước, dừng ngay ở bước nào thành công:
+
+1. **Có sẵn `deploy\vendor\hailort-4.21.0-cp310-cp310-win_amd64.whl` → dùng luôn, không quét gì cả.**
+2. Chưa có → quét `C:\Program Files\HailoRT`, `Hailo`, `%LOCALAPPDATA%\Programs`, `InstallLocation` đọc từ registry Uninstall, `Downloads`/`Desktop` → thấy thì **copy vào vendor**.
+3. Vẫn chưa có → nếu vendor có `.msi` thì **tự chạy `msiexec /passive`** (bỏ qua bằng `install.bat -NoHailoMsi`) rồi quét lại.
+4. Vẫn chưa có → in hướng dẫn “cài HailoRT trước rồi chạy lại”, thoát code 1 (installer chỉ cảnh báo, vẫn cài xong phần còn lại).
+
+Chỉ nhận đúng tag `4.21.0 / cp310 / win_amd64` — sai phiên bản là vi phạm quy tắc bất di bất dịch, muốn ép thì `-AnyHailoVersion`. Sau khi cài xong, installer chạy thử `import hailo_platform` để bắt lỗi thiếu driver ngay lúc cài.
+
+Trên **máy dev đã cài HailoRT**, `deploy\make_package.ps1` tự gọi script này trước khi đóng gói → gói `.zip` đem đi đã có sẵn wheel, máy kiosk không phải tìm. Chạy tay: `powershell -ExecutionPolicy Bypass -File deploy\windows\fetch_hailo_wheel.ps1`.
+
+### Visual C++ Build Tools — chỉ cài khi pip thật sự cần
+
+Với `requirements.txt` hiện tại **không cần** (numpy/opencv/pandas/faiss/pillow đều có wheel `cp310-win_amd64` dựng sẵn). Nếu sau này thêm gói không có wheel, pip báo *“Microsoft Visual C++ 14.0 or greater is required”* — installer bắt đúng chuỗi lỗi đó, gọi `deploy\windows\install_buildtools.ps1` (tải `vs_BuildTools.exe` từ `aka.ms/vs/17/release`, cài silent workload `VCTools`) rồi **pip lại 1 lần**.
+
+| Lệnh | Tác dụng |
+|---|---|
+| `install.bat` | mặc định: chỉ cài Build Tools khi pip báo thiếu |
+| `install.bat -WithBuildTools` | cài sẵn trước khi pip |
+| `install.bat -NoBuildTools` | không bao giờ đụng tới (máy kiosk không mạng) |
+| `install_buildtools.ps1 -CheckOnly` | chỉ kiểm tra (dùng `vswhere`), không cài |
+| `install_buildtools.ps1 -Layout D:\vslayout` | máy có mạng: tải bộ cài offline ~2 GB để copy sang máy không mạng |
+
+Tốn ~2 GB tải + ~5–7 GB ổ đĩa nên **không** bật mặc định trên máy kiosk.
 
 ## G0 — Gate 30 phút (làm TRƯỚC khi build image, trên máy 18.04)
 

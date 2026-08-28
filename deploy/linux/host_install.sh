@@ -78,5 +78,5 @@ echo '{"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"}}' \
     | sudo tee /etc/docker/daemon.json
 sudo systemctl restart docker
 
-echo "== XONG. Tiếp theo: clone repo vào /opt/bridgecam/app (xem README_TRIENKHAI.md mục SSH),"
+echo "== XONG. Tiếp theo: clone repo vào /opt/bridgecam/app (xem README_TRIEN_KHAI.md mục SSH),"
 echo "   build image, cài bridgecam.service =="
