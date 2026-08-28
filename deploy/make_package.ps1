@@ -25,7 +25,7 @@ foreach ($v in @(("hailort-{0}-cp310-cp310-win_amd64.whl" -f $hailoVersion),
 # Chi dong goi nhung gi may kiosk can (khong log, __pycache__, cmd1 cu, venv, id_rsa...)
 $include = @(
     "main_api_cam.py", "Utils.py", "hailo_inference.py", "websocket_server.py",
-    "requirements.txt", "README_TRIENKHAI.md", ".dockerignore",
+    "requirements.txt", "README_TRIEN_KHAI.md", ".dockerignore",
     "scrfd_2.5g.hef", "arcface_r50.hef",
     "deploy", "Web"
 )
